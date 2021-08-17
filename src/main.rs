@@ -23,6 +23,11 @@ mod workspace;
 use self::workspace::ManifestPath;
 
 use crate::cmd::{metadata::MetadataResult, BuildCommand, CheckCommand, TestCommand};
+use subxt::{
+    // system::System, 
+    // Runtime, 
+    DefaultNodeRuntime
+};
 
 #[cfg(feature = "extrinsics")]
 use sp_core::{crypto::Pair, sr25519, H256};
@@ -92,11 +97,16 @@ pub(crate) struct ExtrinsicOpts {
 
 #[cfg(feature = "extrinsics")]
 impl ExtrinsicOpts {
-    pub fn signer(&self) -> Result<PairSigner<subxt::DefaultNodeRuntime, sr25519::Pair>> {
+    pub fn signer(&self) -> Result<PairSigner<DefaultNodeRuntime, sr25519::Pair>> 
+        // where R: System + Runtime,
+        // <<<R as Runtime>::Signature as Verify>::Signer as IdentifyAccount>::AccountId: System::AccountId
+        // <R as Runtime>::Signature: From<sp_core::sr25519::Signature>,
+        // <<R as Runtime>::Signature as Verify>::Signer: From<sp_core::sr25519::Public>,
+    {
         let pair =
             sr25519::Pair::from_string(&self.suri, self.password.as_ref().map(String::as_ref))
                 .map_err(|_| anyhow::anyhow!("Secret string error"))?;
-        Ok(PairSigner::new(pair))
+        Ok(PairSigner::<DefaultNodeRuntime, sr25519::Pair>::new(pair))
     }
 }
 
@@ -481,6 +491,9 @@ enum Command {
         /// Hex encoded data to call a contract constructor
         #[structopt(long)]
         data: HexData,
+        /// Hex encoded salt to call a contract constructor
+        #[structopt(long)]
+        salt: HexData,
     },
 }
 
@@ -567,6 +580,7 @@ fn exec(cmd: Command) -> Result<Option<String>> {
             code_hash,
             gas_limit,
             data,
+            salt,
         } => {
             let contract_account = cmd::execute_instantiate(
                 extrinsic_opts,
@@ -574,6 +588,7 @@ fn exec(cmd: Command) -> Result<Option<String>> {
                 *gas_limit,
                 *code_hash,
                 data.clone(),
+                salt.clone(),
             )?;
             Ok(Some(format!("Contract account: {:?}", contract_account)))
         }
